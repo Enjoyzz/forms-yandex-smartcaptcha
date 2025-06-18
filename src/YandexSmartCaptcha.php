@@ -17,7 +17,6 @@ use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
-use SensitiveParameter;
 
 class YandexSmartCaptcha implements CaptchaInterface
 {
@@ -73,10 +72,12 @@ class YandexSmartCaptcha implements CaptchaInterface
             ->setAttribute(AttributeFactory::create('id', 'captcha-container'));
 
         $options = json_encode(
-            array_merge($this->widgetOptions->toArray(), [
-                'sitekey' => $this->publicKey,
-                'callback' => 'callback'
-            ])
+            array_filter(
+                array_merge($this->widgetOptions->toArray(), [
+                    'sitekey' => $this->publicKey,
+                    'callback' => $this->widgetOptions->isInvisible() ? 'callback' : null,
+                ])
+            )
         );
 
         $formId = $element->getForm()?->getId();
@@ -85,32 +86,41 @@ class YandexSmartCaptcha implements CaptchaInterface
             throw new Exception('The Form Id cannot be null');
         }
 
-        return <<<HTML
+        return <<<HTMLJS
 <script src="https://smartcaptcha.yandexcloud.net/captcha.js?render=onload&onload=onloadFunction" defer></script>
 
 <div {$element->getAttributesString()}></div>
 <script>
+    const invisible = {$this->widgetOptions->isInvisibleAsString()};
     const  form = document.getElementById('{$formId}');
-  function onloadFunction() {
-    if (window.smartCaptcha) {
-      const container = document.getElementById('{$element->getAttribute('id')->getValueString()}');
-      const widgetId = window.smartCaptcha.render(container, {$options});
-     
-      form.addEventListener('submit', function (e) {
-           e.preventDefault();
-           window.smartCaptcha.execute(widgetId);
-      })
-      
+    function onloadFunction() {
+        if (window.smartCaptcha) {
+            const container = document.getElementById('{$element->getAttribute('id')->getValueString()}');
+            const widgetId = window.smartCaptcha.render(container, {$options});
+            
+            if (invisible) {
+                form.addEventListener('submit', function (e) {
+                    e.preventDefault();
+                    window.smartCaptcha.execute(widgetId);
+                })    
+            }
+        
+        }
     }
-  }
-  
-  function callback(token) {
-        form.submit();
+    
+    if (invisible) {
+        function callback(token) {
+            if (typeof form.submit === 'function') {
+                form.submit(); 
+                console.debug('Submit with form.submit()')
+            } else {
+                HTMLFormElement.prototype.submit.call(form);
+                console.debug('Submit with HTMLFormElement.prototype.submit.call()')
+            }
+        }  
     }
-
-  
 </script>
-HTML;
+HTMLJS;
     }
 
     public function validate(Ruleable $element): bool
@@ -164,7 +174,7 @@ HTML;
         }
     }
 
-    public function setPrivateKey(#[SensitiveParameter] string $privateKey): YandexSmartCaptcha
+    public function setPrivateKey(#[\SensitiveParameter] string $privateKey): YandexSmartCaptcha
     {
         $this->privateKey = $privateKey;
         return $this;
@@ -181,6 +191,5 @@ HTML;
         $this->widgetOptions = $widgetOptions;
         return $this;
     }
-
 
 }

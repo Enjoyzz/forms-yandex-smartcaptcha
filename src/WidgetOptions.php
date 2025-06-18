@@ -68,7 +68,7 @@ final class WidgetOptions
 
     public function toArray(): array
     {
-        return array_filter([
+        return [
             'hl' => $this->hl,
             'shieldPosition' => $this->shieldPosition,
             'hideShield' => $this->hideShield,
@@ -76,11 +76,16 @@ final class WidgetOptions
             'webview' => $this->webview,
             'test' => $this->test,
             'callback' => $this->callback,
-        ]);
+        ];
     }
 
     public function isInvisible(): bool
     {
         return $this->invisible ?? false;
+    }
+
+    public function isInvisibleAsString(): string
+    {
+        return $this->invisible ? 'true' : 'false';
     }
 }

@@ -3,13 +3,13 @@
 declare(strict_types=1);
 
 use Enjoys\Dotenv\Dotenv;
-use Enjoys\Forms\AttributeFactory;
 use Enjoys\Forms\Captcha\YandexSmartCaptcha\WidgetOptions;
 use Enjoys\Forms\Captcha\YandexSmartCaptcha\YandexSmartCaptcha;
 use Enjoys\Forms\Form;
 use Enjoys\Forms\Renderer\Html\HtmlRenderer;
 use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\HttpFactory;
+
 
 require __DIR__ . '/../vendor/autoload.php';
 
@@ -28,7 +28,7 @@ $secretKey = $_ENV['SMARTCAPTCHA_SERVER_KEY'] ??
 try {
     $httpFactory = new HttpFactory();
     $form = new Form();
-    $form->setId('sdfsdf');
+    $form->setId('invisible_captcha');
     $captcha = new YandexSmartCaptcha(
         httpClient: new Client(),
         requestFactory: $httpFactory,
@@ -39,13 +39,14 @@ try {
         ->setPrivateKey($secretKey)
         ->setWidgetOptions(
             new WidgetOptions(
+                invisible: true,
+//                test: true
             )
         );
 
-    $form->captcha($captcha)
-        ->addAttribute(AttributeFactory::create('style', 'width: 300px;'));
-
+    $form->captcha($captcha);
     $form->submit('submit');
+
     if ($form->isSubmitted()) {
         dump($_REQUEST);
     }
