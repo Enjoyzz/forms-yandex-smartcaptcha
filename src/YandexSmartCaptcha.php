@@ -5,13 +5,19 @@ declare(strict_types=1);
 namespace Enjoys\Forms\Captcha\YandexSmartCaptcha;
 
 
+use Closure;
+use Enjoys\Forms\AttributeFactory;
 use Enjoys\Forms\Element;
 use Enjoys\Forms\Interfaces\CaptchaInterface;
 use Enjoys\Forms\Interfaces\Ruleable;
 use Enjoys\Forms\Traits\Request;
+use Exception;
+use JsonException;
+use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
+use SensitiveParameter;
 
 class YandexSmartCaptcha implements CaptchaInterface
 {
@@ -20,8 +26,15 @@ class YandexSmartCaptcha implements CaptchaInterface
     private const VERIFY_URL = 'https://smartcaptcha.yandexcloud.net/validate';
     private string $privateKey = 'secret_key';
     private string $publicKey = 'site_key';
+    /**
+     * 'ru' | 'en' | 'be' | 'kk' | 'tt' | 'uk' | 'uz' | 'tr'
+     * @var string
+     */
+    private string $language = 'window.navigator.language';
 
     private ?string $ruleMessage = null;
+
+    private WidgetOptions $widgetOptions;
 
     /**
      * @var array<string, mixed>
@@ -32,8 +45,9 @@ class YandexSmartCaptcha implements CaptchaInterface
         private ClientInterface $httpClient,
         private RequestFactoryInterface $requestFactory,
         private StreamFactoryInterface $streamFactory,
-        private ?\Closure $getUserIpCallback = null
+        private ?Closure $getUserIpCallback = null
     ) {
+        $this->widgetOptions = new WidgetOptions();
     }
 
     public function getName(): string
@@ -51,62 +65,121 @@ class YandexSmartCaptcha implements CaptchaInterface
         $this->ruleMessage = $message;
     }
 
+
     public function renderHtml(Element $element): string
     {
+        $element->addClass('smart-captcha')
+            ->removeAttribute('name')
+            ->setAttribute(AttributeFactory::create('id', 'captcha-container'));
+
+        $options = json_encode(
+            array_merge($this->widgetOptions->toArray(), [
+                'sitekey' => $this->publicKey,
+                'callback' => 'callback'
+            ])
+        );
+
+        $formId = $element->getForm()?->getId();
+
+        if ($formId === null) {
+            throw new Exception('The Form Id cannot be null');
+        }
+
         return <<<HTML
-<script src="https://smartcaptcha.yandexcloud.net/captcha.js" defer></script>
-<div
-    id="captcha-container"
-    class="smart-captcha"
-    data-sitekey="$this->publicKey"
-></div>
+<script src="https://smartcaptcha.yandexcloud.net/captcha.js?render=onload&onload=onloadFunction" defer></script>
+
+<div {$element->getAttributesString()}></div>
+<script>
+    const  form = document.getElementById('{$formId}');
+  function onloadFunction() {
+    if (window.smartCaptcha) {
+      const container = document.getElementById('{$element->getAttribute('id')->getValueString()}');
+      const widgetId = window.smartCaptcha.render(container, {$options});
+     
+      form.addEventListener('submit', function (e) {
+           e.preventDefault();
+           window.smartCaptcha.execute(widgetId);
+      })
+      
+    }
+  }
+  
+  function callback(token) {
+        form.submit();
+    }
+
+  
+</script>
 HTML;
     }
 
     public function validate(Ruleable $element): bool
     {
+        $token = $this->getRequest()->getParsedBody()['smart-token']
+            ?? $this->getRequest()->getQueryParams()['smart-token']
+            ?? null;
+
+        if (empty($token)) {
+            $element->setRuleError('Smart token is missing');
+            return false;
+        }
+
         $data = [
             'secret' => $this->privateKey,
-            'token' => $this->getRequest()->getParsedBody()['smart-token']
-                ?? $this->getRequest()->getQueryParams()['smart-token'] ?? null
+            'token' => $token
         ];
 
         if ($this->getUserIpCallback !== null) {
-            $data['ip'] = call_user_func($this->getUserIpCallback);
+            $data['ip'] = ($this->getUserIpCallback)();
         }
-
 
         $request = $this->requestFactory
             ->createRequest('POST', YandexSmartCaptcha::VERIFY_URL)
             ->withHeader('Content-Type', 'application/x-www-form-urlencoded')
             ->withBody(
                 $this->streamFactory->createStream(
-                    \http_build_query($data, '', '&')
+                    http_build_query($data, '', '&')
                 )
             );
 
-        $response = $this->httpClient->sendRequest($request);
+        try {
+            $response = $this->httpClient->sendRequest($request);
+            $responseBody = json_decode($response->getBody()->getContents(), false, 512, JSON_THROW_ON_ERROR);
 
-        $responseBody = \json_decode($response->getBody()->getContents());
+            if ($responseBody->status !== 'ok') {
+                $element->setRuleError($responseBody->message);
+                return false;
+            }
 
-        if ($responseBody->status !== 'ok') {
-            /** @psalm-suppress UndefinedMethod */
-            $element->setRuleError(implode(', ', [
-                $responseBody->message
-            ]));
+            return true;
+        } catch (JsonException $e) {
+            $element->setRuleError(sprintf("Invalid response from captcha service: %s", $e->getMessage()));
+            return false;
+        } catch (Exception $e) {
+            $element->setRuleError(sprintf("Captcha verification failed: %s", $e->getMessage()));
+            return false;
+        } catch (ClientExceptionInterface $e) {
+            $element->setRuleError(sprintf("Network error during captcha verification: %s", $e->getMessage()));
             return false;
         }
-        return true;
     }
 
-    public function setPrivateKey(#[\SensitiveParameter] string $privateKey): void
+    public function setPrivateKey(#[SensitiveParameter] string $privateKey): YandexSmartCaptcha
     {
         $this->privateKey = $privateKey;
+        return $this;
     }
 
-    public function setPublicKey(string $publicKey): void
+    public function setPublicKey(string $publicKey): YandexSmartCaptcha
     {
         $this->publicKey = $publicKey;
+        return $this;
+    }
+
+    public function setWidgetOptions(WidgetOptions $widgetOptions): YandexSmartCaptcha
+    {
+        $this->widgetOptions = $widgetOptions;
+        return $this;
     }
 
 
