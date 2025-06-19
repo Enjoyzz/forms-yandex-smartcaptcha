@@ -41,10 +41,10 @@ class YandexSmartCaptcha implements CaptchaInterface
     private array $options = [];
 
     public function __construct(
-        private ClientInterface $httpClient,
-        private RequestFactoryInterface $requestFactory,
-        private StreamFactoryInterface $streamFactory,
-        private ?Closure $getUserIpCallback = null
+        private readonly ClientInterface $httpClient,
+        private readonly RequestFactoryInterface $requestFactory,
+        private readonly StreamFactoryInterface $streamFactory,
+        private readonly ?Closure $getUserIpCallback = null
     ) {
         $this->widgetOptions = new WidgetOptions();
     }
@@ -75,7 +75,7 @@ class YandexSmartCaptcha implements CaptchaInterface
             array_filter(
                 array_merge($this->widgetOptions->toArray(), [
                     'sitekey' => $this->publicKey,
-                    'callback' => $this->widgetOptions->isInvisible() ? 'callback' : null,
+                    'callback' => $this->widgetOptions->isInvisible() ? 'invisibleCallbackProcess' : $this->widgetOptions->callback,
                 ])
             )
         );
@@ -109,7 +109,7 @@ class YandexSmartCaptcha implements CaptchaInterface
     }
     
     if (invisible) {
-        function callback(token) {
+        function invisibleCallbackProcess(token) {
             if (typeof form.submit === 'function') {
                 form.submit(); 
                 console.debug('Submit with form.submit()')

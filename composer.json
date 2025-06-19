@@ -2,7 +2,7 @@
   "name": "enjoys/forms-yandex-smartcaptcha",
   "description": "Yandex SmartCaptcha for enjoys/forms",
   "require": {
-    "php": "~8.0.0 | ~8.1.0 | ~8.2.0 | ~8.3.0 | ~8.4.0",
+    "php": "~8.1.0 | ~8.2.0 | ~8.3.0 | ~8.4.0",
     "enjoys/forms": "^5.5",
     "psr/http-client": "^1.0",
     "psr/http-factory": "^1.0"

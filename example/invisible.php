@@ -2,7 +2,8 @@
 
 declare(strict_types=1);
 
-use Enjoys\Dotenv\Dotenv;
+use Enjoys\Forms\Captcha\YandexSmartCaptcha\Language;
+use Enjoys\Forms\Captcha\YandexSmartCaptcha\ShieldPosition;
 use Enjoys\Forms\Captcha\YandexSmartCaptcha\WidgetOptions;
 use Enjoys\Forms\Captcha\YandexSmartCaptcha\YandexSmartCaptcha;
 use Enjoys\Forms\Form;
@@ -11,19 +12,7 @@ use GuzzleHttp\Client;
 use GuzzleHttp\Psr7\HttpFactory;
 
 
-require __DIR__ . '/../vendor/autoload.php';
-
-$dotenv = new Dotenv(__DIR__ . '/../.env');
-$dotenv->loadEnv(true);
-
-$clientKey = $_ENV['SMARTCAPTCHA_PUBLIC_KEY'] ??
-    throw new InvalidArgumentException(
-        'Yandex.SmartCaptcha requires public key. Set in .env: SMARTCAPTCHA_PUBLIC_KEY'
-    );
-$secretKey = $_ENV['SMARTCAPTCHA_SERVER_KEY'] ??
-    throw new InvalidArgumentException(
-        'Yandex.SmartCaptcha requires secret key. Set in .env: SMARTCAPTCHA_SERVER_KEY'
-    );
+include __DIR__ . '/.head.php';
 
 try {
     $httpFactory = new HttpFactory();
@@ -35,12 +24,17 @@ try {
         streamFactory: $httpFactory
     );
 
+    /** @var string $clientKey */
+    /** @var string $secretKey */
     $captcha->setPublicKey($clientKey)
         ->setPrivateKey($secretKey)
         ->setWidgetOptions(
             new WidgetOptions(
+                hl: Language::RU,
+                callback: 'myCallback',
                 invisible: true,
-//                test: true
+                shieldPosition: ShieldPosition::CENTER_LEFT,
+                test: true
             )
         );
 
