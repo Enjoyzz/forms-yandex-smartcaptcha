@@ -84,7 +84,7 @@ final class WidgetOptions
     public function toArray(): array
     {
         return [
-            'hl' => $this->hl->value,
+            'hl' => $this->hl?->value,
             'shieldPosition' => $this->shieldPosition?->value,
             'hideShield' => $this->hideShield,
             'invisible' => $this->invisible,

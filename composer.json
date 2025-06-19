@@ -21,6 +21,11 @@
       "Enjoys\\Forms\\Captcha\\YandexSmartCaptcha\\": "src/"
     }
   },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\Enjoys\\Forms\\Captcha\\YandexSmartCaptcha\\": "tests/"
+    }
+  },
   "config": {
     "allow-plugins": {
       "infection/extension-installer": true

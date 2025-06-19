@@ -18,7 +18,7 @@ use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
 
-class YandexSmartCaptcha implements CaptchaInterface
+final class YandexSmartCaptcha implements CaptchaInterface
 {
     use Request;
 
