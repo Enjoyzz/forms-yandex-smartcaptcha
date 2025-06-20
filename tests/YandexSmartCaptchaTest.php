@@ -18,6 +18,7 @@ use GuzzleHttp\HandlerStack;
 use GuzzleHttp\Psr7\HttpFactory;
 use GuzzleHttp\Psr7\Response;
 use PHPUnit\Framework\TestCase;
+use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\RequestInterface;
 use Psr\Http\Message\ServerRequestInterface;
@@ -54,6 +55,7 @@ class YandexSmartCaptchaTest extends TestCase
 
     public function testRenderHtml(): void
     {
+        $this->captcha->setWidgetOptions(new WidgetOptions(callback: 'myCallback'));
         $element = new Captcha($this->captcha);
         $element->setForm($this->form);
 
@@ -63,6 +65,8 @@ class YandexSmartCaptchaTest extends TestCase
         $this->assertStringContainsString('<div', $result);
         $this->assertStringContainsString('id="captcha-container"', $result);
         $this->assertStringContainsString('test-form', $result);
+        $this->assertStringContainsString('"callback":"myCallback"', $result);
+        $this->assertStringNotContainsString('"invisible":null', $result);
     }
 
     public function testRenderHtmlThrowsExceptionWhenFormIdIsNull(): void
@@ -77,7 +81,7 @@ class YandexSmartCaptchaTest extends TestCase
 
     public function testRenderHtmlWithInvisibleCaptcha(): void
     {
-        $widgetOptions = new WidgetOptions(invisible: true);
+        $widgetOptions = new WidgetOptions(callback: 'myCallback', invisible: true);
         $this->captcha->setWidgetOptions($widgetOptions);
 
         $element = (new Captcha($this->captcha))->setForm($this->form);
@@ -85,8 +89,8 @@ class YandexSmartCaptchaTest extends TestCase
         $result = $this->captcha->renderHtml($element);
 
         $this->assertStringContainsString('"invisible":true', $result);
-        $this->assertStringContainsString('invisibleCallbackProcess', $result);
-        $this->assertStringContainsString('form.addEventListener', $result);
+        $this->assertStringContainsString('"callback":"invisibleCallbackProcess"', $result);
+        $this->assertStringContainsString('const invisible = true', $result);
     }
 
     public function testValidateWhenTokenMissing(): void
@@ -113,6 +117,7 @@ class YandexSmartCaptchaTest extends TestCase
         $element = (new Captcha($this->captcha))->setForm($this->form);
 
         $this->assertFalse($this->captcha->validate($element));
+        $this->assertStringContainsString('Invalid token', $element->getRuleErrorMessage());
     }
 
     public function testValidateWhenApiReturnsOk(): void
@@ -144,7 +149,7 @@ class YandexSmartCaptchaTest extends TestCase
         );
 
         $this->assertFalse($this->captcha->validate($element));
-        $this->assertStringContainsString('Network error', $element->getRuleErrorMessage());
+        $this->assertStringContainsString('Network error during captcha verification: Network error', $element->getRuleErrorMessage());
     }
 
     public function testValidateWithInvalidJson(): void

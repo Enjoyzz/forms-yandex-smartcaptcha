@@ -154,7 +154,10 @@ HTMLJS;
 
         try {
             $response = $this->httpClient->sendRequest($request);
-            $responseBody = json_decode($response->getBody()->getContents(), false, 512, JSON_THROW_ON_ERROR);
+            $responseBody = json_decode(
+                json: $response->getBody()->getContents(),
+                associative: false,
+                flags: JSON_THROW_ON_ERROR);
 
             if ($responseBody->status !== 'ok') {
                 $element->setRuleError($responseBody->message);
@@ -164,9 +167,6 @@ HTMLJS;
             return true;
         } catch (JsonException $e) {
             $element->setRuleError(sprintf("Invalid response from captcha service: %s", $e->getMessage()));
-            return false;
-        } catch (Exception $e) {
-            $element->setRuleError(sprintf("Captcha verification failed: %s", $e->getMessage()));
             return false;
         } catch (ClientExceptionInterface $e) {
             $element->setRuleError(sprintf("Network error during captcha verification: %s", $e->getMessage()));
