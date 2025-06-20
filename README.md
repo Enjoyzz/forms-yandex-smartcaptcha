@@ -1,4 +1,4 @@
-# forms-recaptcha
+# Yandex SmartCaptcha
 
 addon for enjoys/forms
 
