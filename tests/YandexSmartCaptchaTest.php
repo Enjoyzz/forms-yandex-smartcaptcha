@@ -223,4 +223,72 @@ class YandexSmartCaptchaTest extends TestCase
         $element = (new Captcha($this->captcha))->setForm($this->form);
         $this->assertTrue($this->captcha->validate($element));
     }
+
+    public function testValidateTokenFromQueryParams(): void
+    {
+        $this->request->method('getParsedBody')->willReturn([]);
+        $this->request->method('getQueryParams')->willReturn(['smart-token' => 'query-token']);
+        $this->captcha->setRequest($this->request);
+
+        $this->mockHandler->append(new Response(200, [], '{"status":"ok"}'));
+        $element = (new Captcha($this->captcha))->setForm($this->form);
+
+        $this->assertTrue($this->captcha->validate($element));
+    }
+
+    public function testValidateTokenFromBody(): void
+    {
+        $this->request->method('getParsedBody')->willReturn(['smart-token' => 'body-token']);
+        $this->request->method('getQueryParams')->willReturn([]);
+        $this->captcha->setRequest($this->request);
+
+        $this->mockHandler->append(new Response(200, [], '{"status":"ok"}'));
+        $element = (new Captcha($this->captcha))->setForm($this->form);
+
+        $this->assertTrue($this->captcha->validate($element));
+    }
+
+    public function testValidateTokenPriority(): void
+    {
+        $this->request->method('getParsedBody')->willReturn(['smart-token' => 'body-token']);
+        $this->request->method('getQueryParams')->willReturn(['smart-token' => 'query-token']);
+        $this->captcha->setRequest($this->request);
+
+        $this->mockHandler->append(function (RequestInterface $request) {
+            parse_str($request->getBody()->getContents(), $params);
+            $this->assertSame('body-token', $params['token']);
+            return new Response(200, [], '{"status":"ok"}');
+        });
+
+        $element = (new Captcha($this->captcha))->setForm($this->form);
+        $this->assertTrue($this->captcha->validate($element));
+    }
+
+    public function testRenderHtmlThrowsExceptionWhenFormIsNull(): void
+    {
+        // Создаем реальный элемент с null формой
+        $element = new Captcha($this->captcha);
+        $reflection = new \ReflectionProperty($element, 'form');
+        $reflection->setValue($element, null);
+
+        $this->expectException(Exception::class);
+        $this->expectExceptionMessage('The Form Id cannot be null');
+
+        $this->captcha->renderHtml($element);
+    }
+
+    public function testRuleMessageAccessors(): void
+    {
+        $this->assertNull($this->captcha->getRuleMessage());
+
+        $testMessage = 'Custom validation error';
+        $this->captcha->setRuleMessage($testMessage);
+        $this->assertSame($testMessage, $this->captcha->getRuleMessage());
+
+        $this->captcha->setRuleMessage(null);
+        $this->assertNull($this->captcha->getRuleMessage());
+
+        $this->captcha->setRuleMessage('');
+        $this->assertSame('', $this->captcha->getRuleMessage());
+    }
 }
